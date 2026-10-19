@@ -1,11 +1,10 @@
+import time
 import re
 import json
-import sys
 from capa_negocio.servidor_catalog_spacy import validar_catalogo_directo
 import spacy
 from text_to_num import alpha2digit
 from spacy.language import Language
-from spacy.matcher import Matcher
 import json
 
 LANAGUAGE_CODE = "es"
@@ -38,9 +37,6 @@ STOP_WORDS_COMERCIALES = {
     # "de", "del", "para", "por",
     # "unidades", "unidad", "porfa", "favor"
 }
-# por 2
-# con 2
-# de 2
 
 
 def _normalizar_numeros(text: str):
@@ -82,8 +78,9 @@ nlp.add_pipe("extractor_cantidades_comerciales", before="tok2vec")
 def motor_interpretacion(texto_usuario: str) -> list:
     pedido_estructurado = []
 
-    # Separamos si el texto contiene varios productos con "y", "+" o comas
-    lineas = re.split(r'\s+y\s+|\s*,\s*|\s*\+\s*', texto_usuario.strip())
+    # Separamos si el texto contiene varios productos con "y", "+", "también" o comas
+    lineas = re.split(
+        r'\s+y\s+|\s*,\s*|\s*\+\s*|\s*también\s*', texto_usuario.strip())
 
     for linea in lineas:
         if not linea.strip():
@@ -104,9 +101,10 @@ def motor_interpretacion(texto_usuario: str) -> list:
 
             # Captura de números tradicionales (3, 1.5, etc.) si no se detectó agrupador antes
             if token.pos_ == "NUM":
-                if cantidad is None:
+                if cantidad is None and token.is_sent_start:
+                    token_cantidad = _normalizar_numeros(token.text)
                     try:
-                        cantidad = float(token.text.replace(',', '.'))
+                        cantidad = float(token_cantidad.replace(',', '.'))
                         continue
                     except ValueError:
                         pass
@@ -117,12 +115,15 @@ def motor_interpretacion(texto_usuario: str) -> list:
                 continue
 
             # Ignoramos conectores y stop words de inventario
-            if token.text.lower() in STOP_WORDS_COMERCIALES or token.pos_ in ["ADP", "PUNCT"]:
+            if token.text.lower() in STOP_WORDS_COMERCIALES or token.pos_ in ["PUNCT"]:
                 continue
 
-            # Guardamos los elementos limpios del producto
-            if token.pos_ in ["NOUN", "ADJ", "PROPN"] or token.text.isalpha():
-                palabras_producto.append(token.text.lower())
+            if token.pos_ in ["NOUN", "ADJ", "PROPN", "ADP"] or token.text.isalnum():
+                # Lematizamos a singular solo los sustantivos y adjetivos (ej: Quesitos -> quesito)
+                if token.pos_ in ["NOUN", "ADJ"]:
+                    palabras_producto.append(token.lemma_.lower())
+                else:
+                    palabras_producto.append(token.text.lower())
 
         # Si texto no traía números ni agrupadores, por defecto es 1
         if cantidad is None:
@@ -137,7 +138,8 @@ def motor_interpretacion(texto_usuario: str) -> list:
         if nombre_limpio:
             pedido_estructurado.append({
                 "cantidad": cantidad,
-                "nombre": nombre_limpio
+                "nombre": nombre_limpio,
+                "precio": 0
             })
 
     return pedido_estructurado
@@ -145,10 +147,9 @@ def motor_interpretacion(texto_usuario: str) -> list:
 
 # 🏁 BUCLE PRINCIPAL SÍNCRONO Y ULTRA VELOZ
 if __name__ == "__main__":
-    print("\n🏎️ MOTOR REGEX CONFIGURADO EN PYTHON PURO (0ms)")
+    print("\n🏎️ MOTOR SPACY CONFIGURADO EN PYTHON PURO (0ms)")
     print("──────────────────────────────────────────────────────")
-    print("Prueba:")
-    # 🔥 PRUEBA DE ESTRÉS INMEDIATA:
+    print("Prueba Estres:")
     ejemplos = [
         "Una garrafa de ron Medellín doce años",
         "media de aguardiente",
@@ -163,7 +164,11 @@ if __name__ == "__main__":
     ]
 
     for ej in ejemplos:
-        print(f"Texto: '{ej}' -> Extraído: {motor_interpretacion(ej)}")
+        inicio = time.perf_counter()
+        resultado = motor_interpretacion(ej)
+        fin = time.perf_counter()
+        print(
+            f"Texto: '{ej}' -> {resultado} -> Tiempo: {(fin - inicio)*1000:.2f} ms")
 
     while True:
         user_input = input("👤 Mesero: ")

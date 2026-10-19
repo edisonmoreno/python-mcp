@@ -1,10 +1,7 @@
 import sys
 import os
 import pandas as pd
-import math
-import unicodedata
 from capa_cliente.chat_local_spacy import motor_interpretacion
-import spacy
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, "capa_datos", "entrenamiento.xlsx")

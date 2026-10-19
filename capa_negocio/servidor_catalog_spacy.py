@@ -1,10 +1,9 @@
-# ./capa_negocio/servidor_catalogo_regex.py
 import os
 import sqlite3
 
 # 📂 CONFIGURACIÓN DIRECTA DE LA BASE DE DATOS
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "catalogo.db")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(BASE_DIR, "capa_datos", "catalogo.db")
 
 
 def _buscar_en_catalogo(termino: str, limite: int = 5):
@@ -19,12 +18,12 @@ def _buscar_en_catalogo(termino: str, limite: int = 5):
         return []
 
     cursor.execute(
-        "SELECT codigo, nombre FROM buscar_productos WHERE buscar_productos MATCH ? LIMIT ?",
+        "SELECT codigo, nombre, precio FROM buscar_productos WHERE buscar_productos MATCH ? LIMIT ?",
         (query_fts, limite)
     )
     filas = cursor.fetchall()
     conn.close()
-    return [{"codigo": cod, "nombre": nom} for cod, nom in filas]
+    return [{"codigo": cod, "nombre": nom, "precio": pre} for cod, nom, pre in filas]
 
 
 def validar_catalogo_directo(pedido: list) -> dict:
@@ -35,6 +34,7 @@ def validar_catalogo_directo(pedido: list) -> dict:
     for item in pedido:
         nombre = item["nombre"]
         cantidad = item["cantidad"]
+        precio = item["precio"]
 
         coincidencias = _buscar_en_catalogo(nombre)
 
@@ -45,7 +45,8 @@ def validar_catalogo_directo(pedido: list) -> dict:
                 "busqueda": nombre,
                 "codigo": None,
                 "nombre": None,
-                "cantidad": cantidad
+                "cantidad": cantidad,
+                "precio": precio
             }}
 
         if len(coincidencias) == 0:
@@ -65,6 +66,7 @@ def validar_catalogo_directo(pedido: list) -> dict:
             producto_unico = coincidencias[0]
             item_res["data"]["codigo"] = producto_unico["codigo"]
             item_res["data"]["nombre"] = producto_unico["nombre"]
+            item_res["data"]["precio"] = producto_unico["precio"]
 
         productos_procesados.append(item_res)
 
