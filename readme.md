@@ -2,6 +2,7 @@
 ### Requisitos
 - `pip install spacy pandas`
 - `pip install text2num openpyxl`
+- `pip install pydantic-settings` read .env
 - Validar cual usar _sm, _md o _lg
     - `python -m spacy download es_core_news_sm` 12 MB
     - `python -m spacy download es_core_news_md` 40 MB
